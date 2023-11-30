@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 import matplotlib.pyplot as plt
 
+
 class Model:
     def __init__(self, mesh, boundary_conditions):
         self.mesh = mesh
@@ -23,12 +24,134 @@ class Geometry:
     pass
 
 
+class BoundaryConditions:
+    pass
+
+
 class Mesh:
+    def __init__(self, points):
+        self.points = points
+        self.triangles = scipy.spatial.Delaunay(self.points)
+        # self.elements = self._build_elements()
+
+    def _build_elements(self):
+        """
+        Built a list of triangular elements
+        """
+        elements = []
+        tri = scipy.spatial.Delaunay(self.points)
+        for nodes in tri.simplices:
+            elements.append(TriangularElement(nodes, self.points[nodes]))
+        return elements
+
+    def plot(self):
+        _, ax = plt.subplots(figsize=(8, 8))
+        ax.triplot(
+            self.points[:, 0],
+            self.points[:, 1],
+            self.triangles.simplices,
+            linewidth=0.5,
+            color="gray",
+        )
+        ax.plot(
+            self.points[:, 0],
+            self.points[:, 1],
+            "o",
+            markersize=2.5,
+            markeredgecolor="black",
+        )
+        ax.set_aspect("equal")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_title("Mesh")
+
+
+class TriangularElement:
     """
-    Triangular elements
+    Linear triangular element class
+
+    Attributes
+    ----------
+    nodes : list
+        List of nodes corresponding to the element
+
+    vertices : np.ndarray
+        Array containing the (x, y) coordinates of the element's vertices
+
+    area : float
+        Area of the triangular element
+
+    Methods
+    -------
+    _compute_area():
+        Calculate the area of the triangular element using the cross product
+
     """
-    def __init__(self, nodes):
-        self.mesh = scipy.spatial.Delaunay(nodes)
+    def __init__(self, nodes, vertices):
+        """
+        Initialise a linear triangular element.
+
+        Parameters
+        ----------
+        nodes : list
+            List of nodes corresponding to the element
+
+        vertices : np.ndarray
+            Array containing the (x, y) coordinates of the element's vertices
+        """
+        self.nodes = nodes
+        self.vertices = vertices
+        self.area = self._compute_area()
+        self.shape_functions = self._generate_shape_functions()
+
+    def _compute_area(self):
+        """
+        Calculate the area of the triangular element using the cross product
+
+        Returns
+        -------
+        area : float
+            Area of the triangular element
+        """
+        return 0.5 * abs(np.cross(self.vertices[1] - self.vertices[0],
+                                  self.vertices[2] - self.vertices[0]))
+    
+    @staticmethod
+    def _generate_shape_functions():
+        """
+        Generate shape functions for linear triangular element
+
+        Returns
+        -------
+        list of functions
+            List of shape functions for the element
+        """
+        N1 = lambda xi, eta: 1 - xi - eta
+        N2 = lambda xi, eta: xi
+        N3 = lambda xi, eta: eta
+        return [N1, N2, N3]
+
+    def _compute_B_matrix(self):
+        """
+        Calculate the strain-displacement matrix
+        """
+        pass
+
+    def _compute_element_stiffness_matrix(self):
+        """
+        B : np.ndarray
+
+        C : np.ndarray
+            Stiffness tensor
+
+        k_e = t_e * A_e * B^T * C * B
+        """
+        pass
+
+
+
+class ShapeFunction:
+    pass
 
 
 class LocalStiffnessMatrix:
@@ -69,16 +192,5 @@ class ConstitutiveModel:
         """
         Compute the stiffness tensor C : plane strain
         """
-        return (
-            E
-            / ((1 + v) * (1 - 2 * v))
-            * np.array([[1 - v, v, 0], [v, 1 - v, 0], [0, 0, .5 - v]])
-        )
-
-
-class ShapeFunction:
-    pass
-
-
-class BoundaryConditions:
-    pass
+        factor =  E / ((1 + v) * (1 - 2 * v))
+        return factor * np.array([[1 - v, v, 0], [v, 1 - v, 0], [0, 0, 0.5 - v]])
