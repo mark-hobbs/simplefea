@@ -25,14 +25,24 @@ class Geometry:
 
 
 class BoundaryConditions:
-    pass
+    """
+    Attributes
+    ----------
+    flag : ndarray
+        0 - no boundary condition
+        1 - the node is subject to a boundary condition
+    """
+    def __init__(self, flag, unit_vector, magnitude):
+        self.flag = flag
+        self.unit_vector
+        self.magnitude
 
 
 class Mesh:
     def __init__(self, points):
         self.points = points
         self.triangles = scipy.spatial.Delaunay(self.points)
-        # self.elements = self._build_elements()
+        self.elements = self._build_elements()
 
     def _build_elements(self):
         """
@@ -130,6 +140,9 @@ class TriangularElement:
         N2 = lambda xi, eta: xi
         N3 = lambda xi, eta: eta
         return [N1, N2, N3]
+    
+    def _compute_shape_function_derivatives():
+        pass
 
     def _compute_B_matrix(self):
         """
@@ -151,15 +164,31 @@ class TriangularElement:
 
 
 class ShapeFunction:
+    """
+    This class is probably not needed as the TriangularElement class captures
+    the relevant functionality
+    """
     pass
 
 
 class LocalStiffnessMatrix:
+    """
+    This class is probably not needed as the TriangularElement class captures
+    the relevant functionality
+    """
     pass
 
 
 class GlobalStiffnessMatrix:
-    pass
+    """
+    Global Stiffness Matrix class
+
+    - Assemble the global stiffness matrix by summing contributions from 
+      individual elements.
+    - Account for boundary conditions during assembly.
+    """
+    def __init__(self, mesh):
+        pass
 
 
 class Material:
