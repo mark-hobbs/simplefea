@@ -113,6 +113,7 @@ class TriangularElement:
         self.vertices = vertices
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
+        self.B = self._compute_B_matrix()
 
     def _compute_area(self):
         """
@@ -144,11 +145,14 @@ class TriangularElement:
     def _compute_shape_function_derivatives():
         pass
 
-    def _compute_B_matrix(self):
+    @staticmethod
+    def _compute_B_matrix():
         """
         Calculate the strain-displacement matrix
         """
-        pass
+        return np.array([[-1, 0, 1, 0, 0, 0],
+                         [0, -1, 0, 0, 0, 1],
+                         [-1, -1, 0, 1, 1, 0]])
 
     def _compute_element_stiffness_matrix(self):
         """
@@ -159,7 +163,7 @@ class TriangularElement:
 
         k_e = t_e * A_e * B^T * C * B
         """
-        pass
+        return t * self.area * np.transpose(self.B) * C * self.B
 
 
 
@@ -190,6 +194,18 @@ class GlobalStiffnessMatrix:
     def __init__(self, mesh):
         pass
 
+    def _assemble_K(self):
+        """
+        Assemble the global stiffness matrix by summing contribution from 
+        individual elements
+
+        Returns
+        -------
+        K : np.ndarray
+            Global stiffness matrix
+        """
+        for element in mesh.elements:
+            pass
 
 class Material:
     """
