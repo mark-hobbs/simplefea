@@ -114,6 +114,7 @@ class TriangularElement:
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
         self.B = self._compute_B_matrix()
+        self.k = self._compute_element_stiffness_matrix()
 
     def _compute_area(self):
         """
@@ -192,7 +193,7 @@ class GlobalStiffnessMatrix:
     - Account for boundary conditions during assembly.
     """
     def __init__(self, mesh):
-        pass
+        self.K = self._assemble_K()
 
     def _assemble_K(self):
         """

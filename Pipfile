@@ -8,6 +8,7 @@ jupyter = "*"
 scikit-learn = "*"
 matplotlib = "*"
 black = "*"
+numpy = "*"
 
 [dev-packages]
 
