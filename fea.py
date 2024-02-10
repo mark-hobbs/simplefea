@@ -32,6 +32,7 @@ class BoundaryConditions:
         0 - no boundary condition
         1 - the node is subject to a boundary condition
     """
+
     def __init__(self, flag, unit_vector, magnitude):
         self.flag = flag
         self.unit_vector
@@ -43,16 +44,16 @@ class Mesh:
         self.points = points
         self.triangles = scipy.spatial.Delaunay(self.points)
         self.elements = self._build_elements()
+        # self.t = t
 
     def _build_elements(self):
         """
         Built a list of triangular elements
         """
-        elements = []
-        tri = scipy.spatial.Delaunay(self.points)
-        for nodes in tri.simplices:
-            elements.append(TriangularElement(nodes, self.points[nodes]))
-        return elements
+        return [
+            TriangularElement(nodes, self.points[nodes])
+            for nodes in self.triangles.simplices
+        ]
 
     def plot(self):
         _, ax = plt.subplots(figsize=(8, 8))
@@ -97,6 +98,7 @@ class TriangularElement:
         Calculate the area of the triangular element using the cross product
 
     """
+
     def __init__(self, nodes, vertices):
         """
         Initialise a linear triangular element.
@@ -114,7 +116,7 @@ class TriangularElement:
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
         self.B = self._compute_B_matrix()
-        self.k = self._compute_element_stiffness_matrix()
+        # self.k = self._compute_element_stiffness_matrix(t, constitutive_model)
 
     def _compute_area(self):
         """
@@ -125,9 +127,12 @@ class TriangularElement:
         area : float
             Area of the triangular element
         """
-        return 0.5 * abs(np.cross(self.vertices[1] - self.vertices[0],
-                                  self.vertices[2] - self.vertices[0]))
-    
+        return 0.5 * abs(
+            np.cross(
+                self.vertices[1] - self.vertices[0], self.vertices[2] - self.vertices[0]
+            )
+        )
+
     @staticmethod
     def _generate_shape_functions():
         """
@@ -142,7 +147,7 @@ class TriangularElement:
         N2 = lambda xi, eta: xi
         N3 = lambda xi, eta: eta
         return [N1, N2, N3]
-    
+
     def _compute_shape_function_derivatives():
         pass
 
@@ -151,11 +156,11 @@ class TriangularElement:
         """
         Calculate the strain-displacement matrix
         """
-        return np.array([[-1, 0, 1, 0, 0, 0],
-                         [0, -1, 0, 0, 0, 1],
-                         [-1, -1, 0, 1, 1, 0]])
+        return np.array(
+            [[-1, 0, 1, 0, 0, 0], [0, -1, 0, 0, 0, 1], [-1, -1, 0, 1, 1, 0]]
+        )
 
-    def _compute_element_stiffness_matrix(self):
+    def _compute_element_stiffness_matrix(self, t, constitutive_model):
         """
         B : np.ndarray
 
@@ -164,8 +169,7 @@ class TriangularElement:
 
         k_e = t_e * A_e * B^T * C * B
         """
-        return t * self.area * np.transpose(self.B) * C * self.B
-
+        return t * self.area * np.transpose(self.B) * constitutive_model.C * self.B
 
 
 class ShapeFunction:
@@ -173,6 +177,7 @@ class ShapeFunction:
     This class is probably not needed as the TriangularElement class captures
     the relevant functionality
     """
+
     pass
 
 
@@ -181,6 +186,7 @@ class LocalStiffnessMatrix:
     This class is probably not needed as the TriangularElement class captures
     the relevant functionality
     """
+
     pass
 
 
@@ -188,16 +194,17 @@ class GlobalStiffnessMatrix:
     """
     Global Stiffness Matrix class
 
-    - Assemble the global stiffness matrix by summing contributions from 
+    - Assemble the global stiffness matrix by summing contributions from
       individual elements.
     - Account for boundary conditions during assembly.
     """
+
     def __init__(self, mesh):
         self.K = self._assemble_K()
 
     def _assemble_K(self):
         """
-        Assemble the global stiffness matrix by summing contribution from 
+        Assemble the global stiffness matrix by summing contribution from
         individual elements
 
         Returns
@@ -207,6 +214,7 @@ class GlobalStiffnessMatrix:
         """
         for element in mesh.elements:
             pass
+
 
 class Material:
     """
@@ -238,5 +246,5 @@ class ConstitutiveModel:
         """
         Compute the stiffness tensor C : plane strain
         """
-        factor =  E / ((1 + v) * (1 - 2 * v))
+        factor = E / ((1 + v) * (1 - 2 * v))
         return factor * np.array([[1 - v, v, 0], [v, 1 - v, 0], [0, 0, 0.5 - v]])
