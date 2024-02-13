@@ -11,7 +11,7 @@ class Model:
         self.K = GlobalStiffnessMatrix(self.mesh)
 
     def solve(self):
-        return np.linalg.solve(K, f)
+        return np.linalg.solve(self.K.K, self.boundary_conditions.f)
 
     def plot(self):
         """
@@ -20,38 +20,21 @@ class Model:
         pass
 
 
-class Geometry:
-    pass
-
-
-class BoundaryConditions:
-    """
-    Attributes
-    ----------
-    flag : ndarray
-        0 - no boundary condition
-        1 - the node is subject to a boundary condition
-    """
-
-    def __init__(self, flag, unit_vector, magnitude):
-        self.flag = flag
-        self.unit_vector
-        self.magnitude
-
-
 class Mesh:
-    def __init__(self, points):
+    def __init__(self, points, material, t):
         self.points = points
+        self.material = material
+        self.t = t
+        self.n_nodes = len(self.points)
         self.triangles = scipy.spatial.Delaunay(self.points)
-        self.elements = self._build_elements()
-        # self.t = t
+        self.elements = self._build_elements(material.constitutive_model)
 
-    def _build_elements(self):
+    def _build_elements(self, constitutive_model):
         """
         Built a list of triangular elements
         """
         return [
-            TriangularElement(nodes, self.points[nodes])
+            TriangularElement(nodes, self.points[nodes], self.t, constitutive_model)
             for nodes in self.triangles.simplices
         ]
 
@@ -77,6 +60,22 @@ class Mesh:
         ax.set_title("Mesh")
 
 
+class BoundaryConditions:
+    """
+    Attributes
+    ----------
+    flag : ndarray
+        0 - no boundary condition
+        1 - the node is subject to a boundary condition
+    """
+
+    def __init__(self, flag, unit_vector, magnitude):
+        self.flag = flag
+        self.unit_vector = unit_vector
+        self.magnitude = magnitude
+        self.f = (unit_vector * magnitude).reshape(-1, 1)
+
+
 class TriangularElement:
     """
     Linear triangular element class
@@ -99,7 +98,7 @@ class TriangularElement:
 
     """
 
-    def __init__(self, nodes, vertices):
+    def __init__(self, nodes, vertices, t, constitutive_model):
         """
         Initialise a linear triangular element.
 
@@ -116,7 +115,7 @@ class TriangularElement:
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
         self.B = self._compute_B_matrix()
-        # self.k = self._compute_element_stiffness_matrix(t, constitutive_model)
+        self.k = self._compute_element_stiffness_matrix(t, constitutive_model)
 
     def _compute_area(self):
         """
@@ -169,25 +168,7 @@ class TriangularElement:
 
         k_e = t_e * A_e * B^T * C * B
         """
-        return t * self.area * np.transpose(self.B) * constitutive_model.C * self.B
-
-
-class ShapeFunction:
-    """
-    This class is probably not needed as the TriangularElement class captures
-    the relevant functionality
-    """
-
-    pass
-
-
-class LocalStiffnessMatrix:
-    """
-    This class is probably not needed as the TriangularElement class captures
-    the relevant functionality
-    """
-
-    pass
+        return t * self.area * np.transpose(self.B) @ constitutive_model.C @ self.B
 
 
 class GlobalStiffnessMatrix:
@@ -200,9 +181,9 @@ class GlobalStiffnessMatrix:
     """
 
     def __init__(self, mesh):
-        self.K = self._assemble_K()
+        self.K = self._assemble_K(mesh)
 
-    def _assemble_K(self):
+    def _assemble_K(self, mesh):
         """
         Assemble the global stiffness matrix by summing contribution from
         individual elements
@@ -212,8 +193,18 @@ class GlobalStiffnessMatrix:
         K : np.ndarray
             Global stiffness matrix
         """
+        K = np.zeros((2 * mesh.n_nodes, 2 * mesh.n_nodes))
+
         for element in mesh.elements:
-            pass
+            k_e = element.k
+            for i in range(len(element.nodes)):
+                for j in range(len(element.nodes)):
+                    I = element.nodes[i]
+                    J = element.nodes[j]
+                    K[2 * I : 2 * I + 2, 2 * J : 2 * J + 2] += k_e[
+                        2 * i : 2 * i + 2, 2 * j : 2 * j + 2
+                    ]
+        return K
 
 
 class Material:
@@ -221,28 +212,48 @@ class Material:
     Attributes
     ----------
     E : float
-    Young's modulus
+        Young's modulus
 
     v : float
         Poisson's ratio
+
+    constitutive_model : ConstitutiveModel
+        Material constitutive model
     """
 
-    def __init__(self, E, v):
+    def __init__(self, E, v, constitutive_model=None, **kwargs):
         self.E = E
         self.v = v
+        if constitutive_model:
+            self.constitutive_model = constitutive_model(self, **kwargs)
+        else:
+            self.constitutive_model = None
+
+    def set_constitutive_model(self, constitutive_model_cls, **kwargs):
+        self.constitutive_model = constitutive_model_cls(self, **kwargs)
 
 
 class ConstitutiveModel:
+    """
+    Base class for constitutive models
+    """
+
+    def __init__(self, material, **kwargs):
+        self.material = material
+
+
+class LinearElasticModel(ConstitutiveModel):
     """
     Linear elastic material
 
     stress tensor = stiffness tensor x strain tensor
     """
 
-    def __init__(self, material):
-        self.C = self._compute_C(material.E, material.C)
+    def __init__(self, material, **kwargs):
+        super().__init__(material, **kwargs)
+        self.C = self._compute_C(material.E, material.v)
 
-    def _compute_C(E, v):
+    def _compute_C(self, E, v):
         """
         Compute the stiffness tensor C : plane strain
         """
