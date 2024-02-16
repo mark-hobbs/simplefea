@@ -6,18 +6,56 @@ import matplotlib.pyplot as plt
 class Model:
     def __init__(self, mesh, boundary_conditions):
         self.mesh = mesh
-        self.boundary_conditions = boundary_conditions
+        self.bc = boundary_conditions
 
         self.K = GlobalStiffnessMatrix(self.mesh)
 
     def solve(self):
-        return np.linalg.solve(self.K.K, self.boundary_conditions.f)
+        """
+        F = Ku
+        b = ax
+        """
+        self.u = np.linalg.solve(self.K.K, self.bc.f)
+        return self.u
 
-    def plot(self):
+    def plot_boundary_conditions(self):
         """
-        Plot the solution
+        TODO: add option to plot constraints in x and y direction
         """
-        pass
+        ax = self.mesh.plot(nodes=False, simplices=False)
+        ax.plot(
+            self.mesh.points[:, 0][self.bc.flag[:, 0] == 1],
+            self.mesh.points[:, 1][self.bc.flag[:, 0] == 1],
+            "o",
+            markersize=2.5,
+            c="blue",
+        )
+
+    def plot_solution(self, dsf=1):
+        """
+        Plot the solution (deformed mesh)
+
+        dsf : float
+            Displacement scale factor
+        """
+        displaced_points = self.mesh.points + (self.u.reshape(-1, 2) * dsf)
+        _, ax = plt.subplots(figsize=(8, 8))
+        ax.triplot(
+            displaced_points[:, 0],
+            displaced_points[:, 1],
+            self.mesh.triangles.simplices,
+            linewidth=0.5,
+            color="gray",
+        )
+        ax.plot(
+            displaced_points[:, 0],
+            displaced_points[:, 1],
+            "o",
+            markersize=2.5,
+            markeredgecolor="black",
+        )
+        ax.set_aspect("equal")
+        ax.set_title("Deformed mesh")
 
 
 class Mesh:
@@ -38,7 +76,7 @@ class Mesh:
             for nodes in self.triangles.simplices
         ]
 
-    def plot(self):
+    def plot(self, nodes=False, simplices=False):
         _, ax = plt.subplots(figsize=(8, 8))
         ax.triplot(
             self.points[:, 0],
@@ -54,10 +92,21 @@ class Mesh:
             markersize=2.5,
             markeredgecolor="black",
         )
+
+        if nodes:
+            for i, p in enumerate(self.points):
+                ax.text(p[0], p[1], f"{i}", fontsize=10, ha="right", va="bottom")
+
+        if simplices:
+            for j, t in enumerate(self.triangles.simplices):
+                p = np.mean(self.points[t], axis=0)
+                ax.text(p[0], p[1], f"{j}", color="gray", fontsize=8)
+
         ax.set_aspect("equal")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_title("Mesh")
+        return ax
 
 
 class BoundaryConditions:
@@ -73,7 +122,13 @@ class BoundaryConditions:
         self.flag = flag
         self.unit_vector = unit_vector
         self.magnitude = magnitude
-        self.f = (unit_vector * magnitude).reshape(-1, 1)
+        self.f = self._build_f()
+
+    def _build_f(self):
+        return (self.unit_vector * self.magnitude).flatten()
+
+    def plot(self):
+        pass
 
 
 class TriangularElement:
@@ -162,6 +217,7 @@ class TriangularElement:
     def _compute_element_stiffness_matrix(self, t, constitutive_model):
         """
         B : np.ndarray
+            Strain-displacement matrix
 
         C : np.ndarray
             Stiffness tensor
@@ -196,12 +252,11 @@ class GlobalStiffnessMatrix:
         K = np.zeros((2 * mesh.n_nodes, 2 * mesh.n_nodes))
 
         for element in mesh.elements:
-            k_e = element.k
             for i in range(len(element.nodes)):
                 for j in range(len(element.nodes)):
                     I = element.nodes[i]
                     J = element.nodes[j]
-                    K[2 * I : 2 * I + 2, 2 * J : 2 * J + 2] += k_e[
+                    K[2 * I : 2 * I + 2, 2 * J : 2 * J + 2] += element.k[
                         2 * i : 2 * i + 2, 2 * j : 2 * j + 2
                     ]
         return K
