@@ -209,10 +209,31 @@ class TriangularElement:
     def _compute_B_matrix():
         """
         Calculate the strain-displacement matrix
+
+        TODO: this is wrong!
         """
         return np.array(
             [[-1, 0, 1, 0, 0, 0], [0, -1, 0, 0, 0, 1], [-1, -1, 0, 1, 1, 0]]
         )
+
+    # def _compute_B_matrix(self):
+    #     """
+    #     Calculate the strain-displacement matrix
+    #     """
+    #     x = np.zeros((3, 3))
+    #     y = np.zeros((3, 3))
+    #     for i in range(len(self.nodes)):
+    #         for j in range(len(self.nodes)):
+    #             x[i][j] = self.vertices[i][0] - self.vertices[j][0]
+    #             y[i][j] = self.vertices[i][1] - self.vertices[j][1]
+    #     det_J = (x[0][2] * y[1][2]) - (y[0][2] * x[1][2])
+    #     return (1 / det_J) * np.array(
+    #         [
+    #             [y[1][2], 0, y[2][0], 0, y[0][1], 0],
+    #             [0, x[2][1], 0, x[0][2], 0, x[1][0]],
+    #             [x[2][1], y[1][2], x[0][2], y[2][0], x[1][0], y[0][1]],
+    #         ]
+    #     )
 
     def _compute_element_stiffness_matrix(self, t, constitutive_model):
         """
@@ -256,8 +277,8 @@ class GlobalStiffnessMatrix:
                 for j in range(len(element.nodes)):
                     I = element.nodes[i]
                     J = element.nodes[j]
-                    K[2 * I : 2 * I + 2, 2 * J : 2 * J + 2] += element.k[
-                        2 * i : 2 * i + 2, 2 * j : 2 * j + 2
+                    K[(2 * I) : (2 * I) + 2, (2 * J) : (2 * J) + 2] += element.k[
+                        (2 * i) : (2 * i) + 2, (2 * j) : (2 * j) + 2
                     ]
         return K
 
