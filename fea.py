@@ -15,7 +15,7 @@ class Model:
         F = Ku
         b = ax
         """
-        self.u = np.linalg.solve(self.K.K, self.bc.f)
+        self.u = np.linalg.solve(self.K.K, self.bc.f).reshape(-1, 2)
         return self.u
 
     def plot_boundary_conditions(self):
@@ -38,7 +38,7 @@ class Model:
         dsf : float
             Displacement scale factor
         """
-        displaced_points = self.mesh.points + (self.u.reshape(-1, 2) * dsf)
+        displaced_points = self.mesh.points + (self.u * dsf)
         _, ax = plt.subplots(figsize=(8, 8))
         ax.triplot(
             displaced_points[:, 0],
@@ -47,15 +47,66 @@ class Model:
             linewidth=0.5,
             color="gray",
         )
-        ax.plot(
-            displaced_points[:, 0],
-            displaced_points[:, 1],
-            "o",
-            markersize=2.5,
-            markeredgecolor="black",
-        )
         ax.set_aspect("equal")
         ax.set_title("Deformed mesh")
+
+    def plot_u(self, component):
+        """
+        Plot the specified component of displacement u at nodes
+
+        Parameters:
+            component : int
+                0 for x displacement, 1 for y displacement
+        """
+        if component not in (0, 1):
+            raise ValueError(
+                "Component must be 0 for x displacement or 1 for y displacement."
+            )
+
+        _, ax = plt.subplots(figsize=(8, 8))
+        ax.scatter(
+            self.mesh.points[:, 0],
+            self.mesh.points[:, 1],
+            c=self.u[:, component],
+            cmap="viridis",
+        )
+        ax.set_aspect("equal")
+        ax.set_title(f"u$_{{{ 'x' if component == 0 else 'y' }}}$")
+
+    def plot_stress(self):
+        strains = self.calculate_strain()
+        stresses = np.zeros((len(self.mesh.elements), 3))
+
+        for i, element in enumerate(self.mesh.elements):
+            stresses[i] = self.mesh.material.constitutive_model.C @ strains[i]
+
+        _, ax = plt.subplots(figsize=(8, 8))
+        ax.tripcolor(
+            self.mesh.points[:, 0],
+            self.mesh.points[:, 1],
+            self.mesh.triangles.simplices,
+            facecolors=stresses[:, 0],
+            linewidth=0.01,
+            cmap="viridis",
+        )
+        # plt.colorbar(
+        #     ax.tripcolor(
+        #         self.mesh.points[:, 0],
+        #         self.mesh.points[:, 1],
+        #         self.mesh.triangles.simplices,
+        #         facecolors=stresses[:, 2],
+        #         edgecolors="k",
+        #         linewidth=0.5,
+        #         cmap="viridis",
+        #     )
+        # )
+        ax.set_aspect("equal")
+
+    def calculate_strain(self):
+        strains = np.zeros((len(self.mesh.elements), 3))
+        for i, element in enumerate(self.mesh.elements):
+            strains[i] = element.B @ self.u[element.nodes].flatten()
+        return strains
 
 
 class Mesh:
@@ -205,35 +256,30 @@ class TriangularElement:
     def _compute_shape_function_derivatives():
         pass
 
-    @staticmethod
-    def _compute_B_matrix():
+    def _compute_B_matrix(self):
         """
         Calculate the strain-displacement matrix
-
-        TODO: this is wrong!
         """
-        return np.array(
-            [[-1, 0, 1, 0, 0, 0], [0, -1, 0, 0, 0, 1], [-1, -1, 0, 1, 1, 0]]
-        )
+        x_i, y_i = self.vertices[0]
+        x_j, y_j = self.vertices[1]
+        x_m, y_m = self.vertices[2]
 
-    # def _compute_B_matrix(self):
-    #     """
-    #     Calculate the strain-displacement matrix
-    #     """
-    #     x = np.zeros((3, 3))
-    #     y = np.zeros((3, 3))
-    #     for i in range(len(self.nodes)):
-    #         for j in range(len(self.nodes)):
-    #             x[i][j] = self.vertices[i][0] - self.vertices[j][0]
-    #             y[i][j] = self.vertices[i][1] - self.vertices[j][1]
-    #     det_J = (x[0][2] * y[1][2]) - (y[0][2] * x[1][2])
-    #     return (1 / det_J) * np.array(
-    #         [
-    #             [y[1][2], 0, y[2][0], 0, y[0][1], 0],
-    #             [0, x[2][1], 0, x[0][2], 0, x[1][0]],
-    #             [x[2][1], y[1][2], x[0][2], y[2][0], x[1][0], y[0][1]],
-    #         ]
-    #     )
+        gamma_i = x_m - x_j
+        gamma_j = x_i - x_m
+        gamma_m = x_j - x_i
+
+        beta_i = y_j - y_m
+        beta_j = y_m - y_i
+        beta_m = y_i - y_j
+
+        alpha = np.array(
+            [
+                [beta_i, 0, beta_j, 0, beta_m, 0],
+                [0, gamma_i, 0, gamma_j, 0, gamma_m],
+                [gamma_i, beta_i, gamma_j, beta_j, gamma_m, beta_m],
+            ]
+        )
+        return (1 / (2 * self.area)) * alpha
 
     def _compute_element_stiffness_matrix(self, t, constitutive_model):
         """
@@ -334,4 +380,13 @@ class LinearElasticModel(ConstitutiveModel):
         Compute the stiffness tensor C : plane strain
         """
         factor = E / ((1 + v) * (1 - 2 * v))
-        return factor * np.array([[1 - v, v, 0], [v, 1 - v, 0], [0, 0, 0.5 - v]])
+        return factor * np.array(
+            [[1 - v, v, 0], [v, 1 - v, 0], [0, 0, (1 - 2 * v) / 2]]
+        )
+
+    # def _compute_C(self, E, v):
+    #     """
+    #     Compute the stiffness tensor C : plane stress
+    #     """
+    #     factor = E / (1 - v**2)
+    #     return factor * np.array([[1, v, 0], [v, 1, 0], [0, 0, (1 - v) / 2]])
