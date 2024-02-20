@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 
 
 class Model:
-    def __init__(self, mesh, boundary_conditions):
+    def __init__(self, mesh, boundary_conditions, constraints):
         self.mesh = mesh
         self.bc = boundary_conditions
+        self.constraints = constraints
 
-        self.K = GlobalStiffnessMatrix(self.mesh)
+        self.K = GlobalStiffnessMatrix(self.mesh, constraints)
 
     def solve(self):
         """
@@ -54,9 +55,10 @@ class Model:
         """
         Plot the specified component of displacement u at nodes
 
-        Parameters:
-            component : int
-                0 for x displacement, 1 for y displacement
+        Parameters
+        ----------
+        component : int
+            0 for x displacement, 1 for y displacement
         """
         if component not in (0, 1):
             raise ValueError(
@@ -86,20 +88,8 @@ class Model:
             self.mesh.points[:, 1],
             self.mesh.triangles.simplices,
             facecolors=stresses[:, 0],
-            linewidth=0.01,
-            cmap="viridis",
+            cmap="jet",
         )
-        # plt.colorbar(
-        #     ax.tripcolor(
-        #         self.mesh.points[:, 0],
-        #         self.mesh.points[:, 1],
-        #         self.mesh.triangles.simplices,
-        #         facecolors=stresses[:, 2],
-        #         edgecolors="k",
-        #         linewidth=0.5,
-        #         cmap="viridis",
-        #     )
-        # )
         ax.set_aspect("equal")
 
     def calculate_strain(self):
@@ -126,8 +116,27 @@ class Mesh:
             TriangularElement(nodes, self.points[nodes], self.t, constitutive_model)
             for nodes in self.triangles.simplices
         ]
+    
+    def info(self):
+        """
+        Print the number of nodes and number of elements
+        """
+        print(f"Number of nodes: {self.n_nodes}")
+        print(f"Number of elements: {len(self.elements)}")
 
     def plot(self, nodes=False, simplices=False):
+        """
+        Plot the undeformed mesh 
+
+        Parameters
+        ----------
+        nodes : bool, optional
+            If True, plot node indices next to the nodes. Defaults to False.
+
+        simplices : bool, optional
+            If True, plot simplex indices next to the centroids of each 
+            simplex. Defaults to False.
+        """
         _, ax = plt.subplots(figsize=(8, 8))
         ax.triplot(
             self.points[:, 0],
@@ -162,6 +171,8 @@ class Mesh:
 
 class BoundaryConditions:
     """
+    TODO - AppliedForces(BoundaryConditions) and Constraints(BoundaryConditions)
+
     Attributes
     ----------
     flag : ndarray
@@ -292,7 +303,13 @@ class TriangularElement:
         k_e = t_e * A_e * B^T * C * B
         """
         return t * self.area * np.transpose(self.B) @ constitutive_model.C @ self.B
+    
+    def compute_strain(self, u):
+        self.strain = self.B @ u[self.nodes].flatten()
+        return self.strain
 
+    def compute_stress(self):
+        pass
 
 class GlobalStiffnessMatrix:
     """
@@ -303,10 +320,10 @@ class GlobalStiffnessMatrix:
     - Account for boundary conditions during assembly.
     """
 
-    def __init__(self, mesh):
-        self.K = self._assemble_K(mesh)
+    def __init__(self, mesh, constraints):
+        self.K = self._assemble_K(mesh, constraints)
 
-    def _assemble_K(self, mesh):
+    def _assemble_K(self, mesh, constraints):
         """
         Assemble the global stiffness matrix by summing contribution from
         individual elements
@@ -326,6 +343,13 @@ class GlobalStiffnessMatrix:
                     K[(2 * I) : (2 * I) + 2, (2 * J) : (2 * J) + 2] += element.k[
                         (2 * i) : (2 * i) + 2, (2 * j) : (2 * j) + 2
                     ]
+
+        for i, node in enumerate(constraints.flatten()):
+            if node == 1:
+                K[i, :] = 0
+                K[:, i] = 0
+                K[i, i] = 1
+
         return K
 
 
@@ -384,9 +408,9 @@ class LinearElasticModel(ConstitutiveModel):
             [[1 - v, v, 0], [v, 1 - v, 0], [0, 0, (1 - 2 * v) / 2]]
         )
 
-    # def _compute_C(self, E, v):
-    #     """
-    #     Compute the stiffness tensor C : plane stress
-    #     """
-    #     factor = E / (1 - v**2)
-    #     return factor * np.array([[1, v, 0], [v, 1, 0], [0, 0, (1 - v) / 2]])
+    def _compute_C(self, E, v):
+        """
+        Compute the stiffness tensor C : plane stress
+        """
+        factor = E / (1 - v**2)
+        return factor * np.array([[1, v, 0], [v, 1, 0], [0, 0, (1 - v) / 2]])
