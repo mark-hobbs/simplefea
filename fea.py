@@ -9,14 +9,13 @@ class Model:
         self.bc = boundary_conditions
         self.constraints = constraints
 
-        self.K = GlobalStiffnessMatrix(self.mesh, constraints)
+        self.K = GlobalStiffnessMatrix(self.mesh, constraints).K
 
     def solve(self):
         """
-        F = Ku
-        b = ax
+        F = Ku (b = ax)
         """
-        self.u = np.linalg.solve(self.K.K, self.bc.f).reshape(-1, 2)
+        self.u = np.linalg.solve(self.K, self.bc.f).reshape(-1, 2)
         return self.u
 
     def plot_boundary_conditions(self):
@@ -76,11 +75,11 @@ class Model:
         ax.set_title(f"u$_{{{ 'x' if component == 0 else 'y' }}}$")
 
     def plot_stress(self):
-        strains = self.calculate_strain()
         stresses = np.zeros((len(self.mesh.elements), 3))
 
         for i, element in enumerate(self.mesh.elements):
-            stresses[i] = self.mesh.material.constitutive_model.C @ strains[i]
+            strain = element.compute_strain(self.u)
+            stresses[i] = element.compute_stress(strain)
 
         _, ax = plt.subplots(figsize=(8, 8))
         ax.tripcolor(
@@ -91,13 +90,6 @@ class Model:
             cmap="jet",
         )
         ax.set_aspect("equal")
-
-    def calculate_strain(self):
-        strains = np.zeros((len(self.mesh.elements), 3))
-        for i, element in enumerate(self.mesh.elements):
-            strains[i] = element.B @ self.u[element.nodes].flatten()
-        return strains
-
 
 class Mesh:
     def __init__(self, points, material, t):
@@ -229,10 +221,12 @@ class TriangularElement:
         """
         self.nodes = nodes
         self.vertices = vertices
+        self.t = t
+        self.constitutive_model = constitutive_model
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
         self.B = self._compute_B_matrix()
-        self.k = self._compute_element_stiffness_matrix(t, constitutive_model)
+        self.k = self._compute_element_stiffness_matrix()
 
     def _compute_area(self):
         """
@@ -292,7 +286,7 @@ class TriangularElement:
         )
         return (1 / (2 * self.area)) * alpha
 
-    def _compute_element_stiffness_matrix(self, t, constitutive_model):
+    def _compute_element_stiffness_matrix(self):
         """
         B : np.ndarray
             Strain-displacement matrix
@@ -302,14 +296,15 @@ class TriangularElement:
 
         k_e = t_e * A_e * B^T * C * B
         """
-        return t * self.area * np.transpose(self.B) @ constitutive_model.C @ self.B
+        return self.t * self.area * np.transpose(self.B) @ self.constitutive_model.C @ self.B
     
     def compute_strain(self, u):
         self.strain = self.B @ u[self.nodes].flatten()
         return self.strain
 
-    def compute_stress(self):
-        pass
+    def compute_stress(self, strains):
+        self.stress = self.constitutive_model.C @ strains
+        return self.stress
 
 class GlobalStiffnessMatrix:
     """
