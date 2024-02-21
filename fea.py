@@ -91,6 +91,7 @@ class Model:
         )
         ax.set_aspect("equal")
 
+
 class Mesh:
     def __init__(self, points, material, t):
         self.points = points
@@ -98,17 +99,17 @@ class Mesh:
         self.t = t
         self.n_nodes = len(self.points)
         self.triangles = scipy.spatial.Delaunay(self.points)
-        self.elements = self._build_elements(material.constitutive_model)
+        self.elements = self._build_elements()
 
-    def _build_elements(self, constitutive_model):
+    def _build_elements(self):
         """
         Built a list of triangular elements
         """
         return [
-            TriangularElement(nodes, self.points[nodes], self.t, constitutive_model)
+            TriangularElement(nodes, self.points[nodes], self.t, self.material)
             for nodes in self.triangles.simplices
         ]
-    
+
     def info(self):
         """
         Print the number of nodes and number of elements
@@ -118,7 +119,7 @@ class Mesh:
 
     def plot(self, nodes=False, simplices=False):
         """
-        Plot the undeformed mesh 
+        Plot the undeformed mesh
 
         Parameters
         ----------
@@ -126,7 +127,7 @@ class Mesh:
             If True, plot node indices next to the nodes. Defaults to False.
 
         simplices : bool, optional
-            If True, plot simplex indices next to the centroids of each 
+            If True, plot simplex indices next to the centroids of each
             simplex. Defaults to False.
         """
         _, ax = plt.subplots(figsize=(8, 8))
@@ -207,7 +208,7 @@ class TriangularElement:
 
     """
 
-    def __init__(self, nodes, vertices, t, constitutive_model):
+    def __init__(self, nodes, vertices, t, material):
         """
         Initialise a linear triangular element.
 
@@ -218,11 +219,17 @@ class TriangularElement:
 
         vertices : np.ndarray
             Array containing the (x, y) coordinates of the element's vertices
+
+        t : float
+            Thickness of the element
+
+        material : Material
+            Material assigned to the element
         """
         self.nodes = nodes
         self.vertices = vertices
         self.t = t
-        self.constitutive_model = constitutive_model
+        self.material = material
         self.area = self._compute_area()
         self.shape_functions = self._generate_shape_functions()
         self.B = self._compute_B_matrix()
@@ -296,15 +303,22 @@ class TriangularElement:
 
         k_e = t_e * A_e * B^T * C * B
         """
-        return self.t * self.area * np.transpose(self.B) @ self.constitutive_model.C @ self.B
-    
+        return (
+            self.t
+            * self.area
+            * np.transpose(self.B)
+            @ self.material.constitutive_model.C
+            @ self.B
+        )
+
     def compute_strain(self, u):
         self.strain = self.B @ u[self.nodes].flatten()
         return self.strain
 
     def compute_stress(self, strains):
-        self.stress = self.constitutive_model.C @ strains
+        self.stress = self.material.constitutive_model.C @ strains
         return self.stress
+
 
 class GlobalStiffnessMatrix:
     """
