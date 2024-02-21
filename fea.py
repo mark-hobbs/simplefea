@@ -164,7 +164,9 @@ class Mesh:
 
 class BoundaryConditions:
     """
-    TODO - AppliedForces(BoundaryConditions) and Constraints(BoundaryConditions)
+    TODO - AppliedForce(BoundaryConditions)
+           AppliedDisplacement(BoundaryConditions)
+           Constraint(BoundaryConditions)
 
     Attributes
     ----------
