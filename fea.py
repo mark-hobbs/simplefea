@@ -75,11 +75,12 @@ class Model:
         ax.set_title(f"u$_{{{ 'x' if component == 0 else 'y' }}}$")
 
     def plot_stress(self):
-        stresses = np.zeros((len(self.mesh.elements), 3))
-
-        for i, element in enumerate(self.mesh.elements):
-            strain = element.compute_strain(self.u)
-            stresses[i] = element.compute_stress(strain)
+        stresses = np.array(
+            [
+                element.compute_stress(element.compute_strain(self.u))
+                for element in self.mesh.elements
+            ]
+        )
 
         _, ax = plt.subplots(figsize=(8, 8))
         ax.tripcolor(
@@ -355,8 +356,8 @@ class GlobalStiffnessMatrix:
                         (2 * i) : (2 * i) + 2, (2 * j) : (2 * j) + 2
                     ]
 
-        for i, node in enumerate(constraints.flatten()):
-            if node == 1:
+        for i, constraint in enumerate(constraints.flatten()):
+            if constraint == 1:
                 K[i, :] = 0
                 K[:, i] = 0
                 K[i, i] = 1
