@@ -12,5 +12,5 @@
 
 | # | Description | Solution |
 |---|-------------|----------|
-| 1 | 2D plate in tension | |
-| 2 | Using Gaussian process regression to build a surrogate model | |
+| 1 | 2D beam in bending | |
+| 2 | Building a surrogate model | |
