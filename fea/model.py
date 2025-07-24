@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 from typing import Literal, Optional
 
@@ -44,8 +45,10 @@ class Model:
     def solve(self) -> np.ndarray:
         """
         F = Ku (b = ax)
+
+        TODO: K must be a scipy.sparse matrix (CSR/CSC)
         """
-        self.u = np.linalg.solve(self.K, self.bc.f).reshape(-1, 2)
+        self.u = spsolve(self.K, self.bc.f).reshape(-1, 2)
         self._solved = True
         return self.u
 
@@ -130,3 +133,9 @@ class Model:
             shading="gouraud",
         )
         ax.set_aspect("equal")
+
+    def _plot_nodal_field(self):
+        """
+        Generic helper to plot a nodal scalar field
+        """
+        pass
