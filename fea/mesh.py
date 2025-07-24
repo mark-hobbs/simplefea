@@ -2,7 +2,7 @@ import scipy
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .finite_elements import TriangularElement
+from .elements import TriangularElement
 
 
 class Mesh:
