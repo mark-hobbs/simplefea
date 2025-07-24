@@ -1,22 +1,52 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Literal, Optional
 
 from .stiffness import GlobalStiffnessMatrix
 
 
+StressComponent = Literal["xx", "yy", "xy", "vm"]
+
+
 class Model:
+    """
+    Finite Element Model
+
+    Attributes
+    ----------
+    mesh : Mesh
+        Mesh object containing the nodes and elements of the model
+
+    bc : BoundaryConditions
+        Boundary conditions applied to the model
+
+    constraints : np.ndarray
+        Constraints applied to the model
+
+    K : np.ndarray
+        Global stiffness matrix
+
+    u : np.ndarray, optional
+        Nodal displacements, computed after solving F = Ku
+
+    _solved : bool
+        Flag indicating whether the model has been solved
+    """
     def __init__(self, mesh, boundary_conditions, constraints):
         self.mesh = mesh
         self.bc = boundary_conditions
         self.constraints = constraints
 
         self.K = GlobalStiffnessMatrix(self.mesh, constraints).K
+        self.u: Optional[np.ndarray] = None
+        self._solved: bool = False
 
-    def solve(self):
+    def solve(self) -> np.ndarray:
         """
         F = Ku (b = ax)
         """
         self.u = np.linalg.solve(self.K, self.bc.f).reshape(-1, 2)
+        self._solved = True
         return self.u
 
     def plot_boundary_conditions(self):
@@ -76,19 +106,27 @@ class Model:
         ax.set_title(f"u$_{{{ 'x' if component == 0 else 'y' }}}$")
 
     def plot_stress(self):
-        stresses = np.array(
+        element_stresses = np.array(
             [
                 element.compute_stress(element.compute_strain(self.u))
                 for element in self.mesh.elements
             ]
-        )
+        )[:, 0]
+
+        nodal_stresses = np.zeros(len(self.mesh.points))
+        counts = np.zeros(len(self.mesh.points))
+        for stress, tri in zip(element_stresses, self.mesh.triangles.simplices):
+            nodal_stresses[tri] += stress
+            counts[tri] += 1
+        nodal_stresses /= counts
 
         _, ax = plt.subplots(figsize=(8, 8))
-        ax.tripcolor(
+        tpc = ax.tripcolor(
             self.mesh.points[:, 0],
             self.mesh.points[:, 1],
             self.mesh.triangles.simplices,
-            facecolors=stresses[:, 0],
+            nodal_stresses,
             cmap="jet",
+            shading="gouraud",
         )
         ax.set_aspect("equal")
