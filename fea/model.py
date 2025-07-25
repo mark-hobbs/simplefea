@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse
 import matplotlib.pyplot as plt
-from typing import Literal, Optional
+from typing import Optional
 
 from .stiffness import GlobalStiffnessMatrix
 
@@ -36,7 +36,8 @@ class Model:
         self.bc = boundary_conditions
         self.constraints = constraints
 
-        self.K = GlobalStiffnessMatrix(self.mesh, constraints).K
+        self.K: np.ndarray = GlobalStiffnessMatrix(self.mesh, constraints).K
+
         self.u: Optional[np.ndarray] = None
         self.strain: Optional[np.ndarray] = None
         self.stress: Optional[np.ndarray] = None
