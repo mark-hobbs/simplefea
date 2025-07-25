@@ -98,6 +98,8 @@ class TriangularElement:
         -------
         list of functions
             List of shape functions for the element
+
+        TODO: not used. Remove?
         """
         N1 = lambda xi, eta: 1 - xi - eta
         N2 = lambda xi, eta: xi

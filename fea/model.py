@@ -1,12 +1,9 @@
 import numpy as np
-from scipy.sparse.linalg import spsolve
+import scipy.sparse
 import matplotlib.pyplot as plt
 from typing import Literal, Optional
 
 from .stiffness import GlobalStiffnessMatrix
-
-
-StressComponent = Literal["xx", "yy", "xy", "vm"]
 
 
 class Model:
@@ -33,6 +30,7 @@ class Model:
     _solved : bool
         Flag indicating whether the model has been solved
     """
+
     def __init__(self, mesh, boundary_conditions, constraints):
         self.mesh = mesh
         self.bc = boundary_conditions
@@ -40,15 +38,17 @@ class Model:
 
         self.K = GlobalStiffnessMatrix(self.mesh, constraints).K
         self.u: Optional[np.ndarray] = None
+        self.strain: Optional[np.ndarray] = None
+        self.stress: Optional[np.ndarray] = None
         self._solved: bool = False
 
     def solve(self) -> np.ndarray:
         """
         F = Ku (b = ax)
-
-        TODO: K must be a scipy.sparse matrix (CSR/CSC)
         """
-        self.u = spsolve(self.K, self.bc.f).reshape(-1, 2)
+        self.u = scipy.sparse.linalg.spsolve(
+            scipy.sparse.csr_matrix(self.K), self.bc.f
+        ).reshape(-1, 2)
         self._solved = True
         return self.u
 
