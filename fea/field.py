@@ -17,6 +17,8 @@ class Field:
 
     name : str
         Descriptive name for the field (e.g., "displacement", "stress")
+
+    TODO: the field values could also be (n_elements, )?
     """
 
     def __init__(
