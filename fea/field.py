@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import Literal, Optional
+
 
 class Field:
     """
@@ -12,7 +14,7 @@ class Field:
         Field values. Shape can be (n_nodes,) for scalar nodal fields
         or (n_nodes, dim) for vector nodal fields.
 
-    location : Literal["nodal", "elemental"]
+    location : Literal["node", "element"]
         Location of the field values
 
     name : str
@@ -24,7 +26,7 @@ class Field:
     def __init__(
         self,
         values: np.ndarray,
-        location: Literal["nodal", "elemental"],
+        location: Literal["node", "element"],
         name: str = "",
     ):
         self.values = np.array(values)
@@ -47,8 +49,8 @@ class Field:
         - If the field is scalar, plot directly.
         - If the field is vector, specify a component (0=x, 1=y).
         """
-        if self.location != "nodal":
-            raise NotImplementedError("Elemental plotting not implemented yet.")
+        if self.location != "node":
+            raise NotImplementedError("Element plotting not implemented yet.")
 
         data = self.values if self.values.ndim == 1 else self.values[:, component]
         _, ax = plt.subplots(figsize=(8, 8))
